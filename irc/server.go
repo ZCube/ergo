@@ -30,6 +30,7 @@ import (
 	"github.com/ergochat/ergo/irc/datastore"
 	"github.com/ergochat/ergo/irc/flatip"
 	"github.com/ergochat/ergo/irc/flock"
+	"github.com/ergochat/ergo/irc/gormdb"
 	"github.com/ergochat/ergo/irc/history"
 	"github.com/ergochat/ergo/irc/logger"
 	"github.com/ergochat/ergo/irc/modes"
@@ -89,7 +90,9 @@ type Server struct {
 	snomasks          SnoManager
 	store             *buntdb.DB
 	dstore            datastore.Datastore
-	historyDB         mysql.MySQL
+	historyDB         history.HistoryInterface
+	historyDBMySQL    mysql.MySQL
+	historyDBGorm     gormdb.GormDB
 	torLimiter        connection_limits.TorLimiter
 	whoWas            WhoWasList
 	stats             Stats
@@ -642,6 +645,8 @@ func (server *Server) applyConfig(config *Config) (err error) {
 			return fmt.Errorf("Cannot change override-services-hostname after launching the server, rehash aborted")
 		} else if !oldConfig.Datastore.MySQL.Enabled && config.Datastore.MySQL.Enabled {
 			return fmt.Errorf("Cannot enable MySQL after launching the server, rehash aborted")
+		} else if !oldConfig.Datastore.Gorm.Enabled && config.Datastore.Gorm.Enabled {
+			return fmt.Errorf("Cannot enable GORM after launching the server, rehash aborted")
 		} else if oldConfig.Server.MaxLineLen != config.Server.MaxLineLen {
 			return fmt.Errorf("Cannot change max-line-len after launching the server, rehash aborted")
 		}
@@ -726,7 +731,10 @@ func (server *Server) applyConfig(config *Config) (err error) {
 		}
 	} else {
 		if config.Datastore.MySQL.Enabled && config.Datastore.MySQL != oldConfig.Datastore.MySQL {
-			server.historyDB.SetConfig(config.Datastore.MySQL)
+			server.historyDBMySQL.SetConfig(config.Datastore.MySQL)
+		}
+		if config.Datastore.Gorm.Enabled && config.Datastore.Gorm != oldConfig.Datastore.Gorm {
+			server.historyDBGorm.SetConfig(config.Datastore.Gorm)
 		}
 	}
 
@@ -875,10 +883,21 @@ func (server *Server) loadFromDatastore(config *Config) (err error) {
 	server.accounts.Initialize(server)
 
 	if config.Datastore.MySQL.Enabled {
-		server.historyDB.Initialize(server.logger, config.Datastore.MySQL)
+		server.historyDB = &server.historyDBMySQL
+		server.historyDBMySQL.Initialize(server.logger, config.Datastore.MySQL)
 		err = server.historyDB.Open()
 		if err != nil {
 			server.logger.Error("internal", "could not connect to mysql", err.Error())
+			return err
+		}
+	}
+
+	if config.Datastore.Gorm.Enabled {
+		server.historyDB = &server.historyDBGorm
+		server.historyDBGorm.Initialize(server.logger, config.Datastore.Gorm)
+		err = server.historyDB.Open()
+		if err != nil {
+			server.logger.Error("internal", "could not connect to gorm", err.Error())
 			return err
 		}
 	}

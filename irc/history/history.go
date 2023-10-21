@@ -4,6 +4,7 @@
 package history
 
 import (
+	"io"
 	"slices"
 	"sync"
 	"time"
@@ -31,6 +32,18 @@ const (
 const (
 	initialAutoSize = 32
 )
+
+type HistoryInterface interface {
+	Open() (err error)
+	AddChannelItem(target string, item Item, account string) (err error)
+	AddDirectMessage(sender, senderAccount, recipient, recipientAccount string, item Item) (err error)
+	Close()
+	DeleteMsgid(msgid, accountName string) (err error)
+	Export(account string, writer io.Writer)
+	Forget(account string)
+	ListChannels(cfchannels []string) (results []TargetListing, err error)
+	MakeSequence(target, correspondent string, cutoff time.Time) Sequence
+}
 
 // Item represents an event (e.g., a PRIVMSG or a JOIN) and its associated data
 type Item struct {

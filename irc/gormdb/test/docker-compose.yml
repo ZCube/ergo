@@ -1,0 +1,24 @@
+version: "3.4"
+
+services:
+  postgres:
+    image: "postgres:14"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      # POSTGRES_HOST_AUTH_METHOD: md5
+      POSTGRES_INITDB_ARGS: --auth-host=scram-sha-256
+    ports:
+      - "45432:5432"
+
+  mariadb:
+    image: mariadb:10
+    environment:
+      - ALLOW_EMPTY_PASSWORD=no
+      - MARIADB_ROOT_PASSWORD=mariadb
+      - MARIADB_USER=mariadb
+      - MARIADB_DATABASE=mariadb
+      - MARIADB_PASSWORD=mariadb
+    ports:
+      - 43306:3306
